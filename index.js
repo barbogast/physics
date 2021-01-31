@@ -38,7 +38,6 @@ export const init = () => {
 
   let stop = false;
   let interval;
-  let canvasPaths;
   let objects = game.createRectangles();
 
   objects = objects.concat(game.createBouncyBall(20, 20, 0.1));
@@ -83,6 +82,7 @@ export const init = () => {
   });
 
   const draw = () => {
+    ctx.clearRect(0, 0, 500, 500);
     chart.draw(chartCtx, timeSeries);
     objects = objects.map((obj) => _.assoc("path", drawObj(ctx, obj), obj));
     debug(
@@ -97,7 +97,6 @@ export const init = () => {
 
   const tick = () => {
     counter += 1;
-    ctx.clearRect(0, 0, 500, 500);
     objects = objects.map((obj) => _.compose(obj.update, game.move)(obj));
     timeSeries = chart.update(timeSeries, objects, counter);
 
