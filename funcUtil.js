@@ -44,3 +44,11 @@ export const repeat = (len, v) => {
 export const prop = curry((k, o) => o[k]);
 
 export const tail = (a) => a[a.length - 1];
+
+export const applySpec = (spec) => (obj, ...args) =>
+  Object.entries(spec).reduce(
+    (acc, [k, v]) => assoc(k, v(obj[k], ...args), acc),
+    {}
+  );
+
+export const init = (v) => v.slice(0, v.length - 1);

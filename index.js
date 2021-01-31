@@ -25,6 +25,81 @@ const drawObj = _.curry((ctx, obj) => {
   return path;
 });
 
+const actionTypes = {
+  stopClicked: "stopClicked",
+  canvasClicked: "canvasClicked",
+  simulationTick: "simulationTick",
+  simulationIntervalKeyPress: "simulationIntervalKeyPress",
+  increaseSimulationInterval: "increaseSimulationInterval",
+  decreaseSimulationInterval: "decreaseSimulationInterval",
+  addObject: "addObject",
+  draw: "draw",
+};
+
+const updateStopped = (state = false, action) =>
+  action.type === actionTypes.stopClicked ? !state : state;
+
+const updateObjects = (state = [], action) => {
+  switch (action.type) {
+    case actionTypes.addObject:
+      return state.concat(action.object);
+
+    case actionTypes.simulationTick:
+      return state.map((obj) => _.compose(obj.update, game.move)(obj));
+
+    case actionTypes.canvasClicked:
+      let found = false;
+      let newState = state.map((obj) => {
+        const clicked = action.ctx.isPointInPath(obj.path, action.x, action.y);
+        if (clicked) {
+          found = true;
+        }
+        return _.assoc("selected", clicked, obj);
+      });
+      if (!found) {
+        newState = newState.concat(
+          game.createBouncyBall(action.x, action.y, 0.2)
+        );
+      }
+      return newState;
+
+    case actionTypes.draw:
+      return state.map((obj) => _.assoc("path", drawObj(action.ctx, obj), obj));
+
+    default:
+      return state;
+  }
+};
+
+const updateInterval = (state = 10, action) => {
+  switch (action.type) {
+    case actionTypes.simulationIntervalKeyPress: {
+      if (action.key.toLowerCase() === "backspace") {
+        return parseInt(_.init(String(state))) || 0;
+      } else {
+        const newValue = parseInt(String(state) + action.key);
+        return newValue && newValue > 0 ? newValue : state;
+      }
+    }
+    case actionTypes.increaseSimulationInterval:
+      return state + 1;
+    case actionTypes.decreaseSimulationInterval:
+      return state - 1;
+    default:
+      return state;
+  }
+};
+
+const updateCounter = (state = 0, action) =>
+  action.type === actionTypes.simulationTick ? state + 1 : state;
+
+const updateGameState = _.applySpec({
+  stopped: updateStopped,
+  objects: updateObjects,
+  simulationInterval: updateInterval,
+  counter: updateCounter,
+});
+
 export const init = () => {
   const canvas = document.getElementById("tutorial");
   const chartEl = document.getElementById("chart");
@@ -36,72 +111,70 @@ export const init = () => {
   const ctx = canvas.getContext("2d");
   const chartCtx = chartEl.getContext("2d");
 
-  let stop = false;
-  let interval;
-  let objects = game.createRectangles();
+  let state = updateGameState({ objects: game.createRectangles() }, {});
 
-  objects = objects.concat(game.createBouncyBall(20, 20, 0.1));
-  objects = objects.concat(game.createBouncyBall(40, 20, 0.2));
+  state = updateGameState(state, {
+    type: actionTypes.addObject,
+    object: game.createBouncyBall(20, 20, 0.1),
+  });
+
+  state = updateGameState(state, {
+    type: actionTypes.addObject,
+    object: game.createBouncyBall(40, 20, 0.2),
+  });
 
   let timeSeries = chart.initState();
-  let counter = 0;
 
-  const setIntervalLength = (v) => {
-    interval = v;
-    intervalEl.value = interval;
-  };
-  setIntervalLength(10);
-
-  intervalEl.addEventListener("input", (e) => {
-    interval = e.target.value;
+  intervalEl.addEventListener("keydown", (e) => {
+    state = updateGameState(state, {
+      type: actionTypes.simulationIntervalKeyPress,
+      key: e.key,
+    });
   });
   intervalIncreaseEl.addEventListener("click", () => {
-    setIntervalLength(interval + 1);
+    state = updateGameState(state, {
+      type: actionTypes.increaseSimulationInterval,
+    });
   });
   intervalDecreaseEl.addEventListener("click", () => {
-    setIntervalLength(interval - 1);
+    state = updateGameState(state, {
+      type: actionTypes.decreaseSimulationInterval,
+    });
   });
   stopBtn.addEventListener("click", () => {
-    stop = true;
+    state = updateGameState(state, { type: actionTypes.stopClicked });
   });
 
   canvas.addEventListener("click", (e) => {
-    let found = false;
-    objects = objects.map((obj) => {
-      const clicked = ctx.isPointInPath(obj.path, e.offsetX, e.offsetY);
-      if (clicked) {
-        found = true;
-      }
-      return _.assoc("selected", clicked, obj);
+    state = updateGameState(state, {
+      type: actionTypes.canvasClicked,
+      x: e.offsetX,
+      y: e.offsetY,
+      ctx,
     });
-    if (!found) {
-      objects = objects.concat(
-        game.createBouncyBall(e.offsetX, e.offsetY, 0.2)
-      );
-    }
   });
 
   const draw = () => {
     ctx.clearRect(0, 0, 500, 500);
+    intervalEl.value = state.simulationInterval;
     chart.draw(chartCtx, timeSeries);
-    objects = objects.map((obj) => _.assoc("path", drawObj(ctx, obj), obj));
+    state = updateGameState(state, { type: actionTypes.draw, ctx });
     debug(
       debugEl,
-      counter,
-      objects.find(_.prop("selected")) || _.tail(objects)
+      state.counter,
+      state.objects.find(_.prop("selected")) || _.tail(state.objects)
     );
-    if (!stop) {
+    if (!state.stopped) {
       requestAnimationFrame(draw);
     }
   };
 
   const tick = () => {
-    counter += 1;
-    objects = objects.map((obj) => _.compose(obj.update, game.move)(obj));
-    timeSeries = chart.update(timeSeries, objects, counter);
+    state = updateGameState(state, { type: actionTypes.simulationTick });
+    timeSeries = chart.update(timeSeries, state.objects, state.counter);
 
-    if (!stop) {
-      setTimeout(tick, interval);
+    if (!state.stopped) {
+      setTimeout(tick, state.simulationInterval);
     }
   };
 
