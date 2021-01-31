@@ -1,8 +1,6 @@
 import * as _ from "./funcUtil.js";
 import * as chart from "./chart.js";
 
-const CHART_WITDH = 500;
-
 const debug = (el, tick, obj) => {
   el.innerHTML = JSON.stringify(
     _.merge(
@@ -114,8 +112,7 @@ export const init = () => {
   objects = objects.concat(createBouncyBall(20, 20, 0.1));
   objects = objects.concat(createBouncyBall(40, 20, 0.2));
 
-  let speedSeries = _.repeat(CHART_WITDH, 0);
-  let xSeries = _.repeat(CHART_WITDH, 0);
+  let timeSeries = chart.initState();
   let counter = 0;
 
   const setIntervalLength = (v) => {
@@ -152,7 +149,7 @@ export const init = () => {
   });
 
   const draw = () => {
-    chart.draw(chartCtx, { green: xSeries, blue: speedSeries });
+    chart.draw(chartCtx, timeSeries);
     objects = objects.map((obj) => _.assoc("path", drawObj(ctx, obj), obj));
     debug(
       debugEl,
@@ -168,9 +165,7 @@ export const init = () => {
     counter += 1;
     ctx.clearRect(0, 0, 500, 500);
     objects = objects.map((obj) => _.compose(obj.update, move)(obj));
-    let res = chart.update({ xSeries, speedSeries }, objects, counter);
-    xSeries = res.xSeries;
-    speedSeries = res.speedSeries;
+    timeSeries = chart.update(timeSeries, objects, counter);
 
     if (!stop) {
       setTimeout(tick, interval);
