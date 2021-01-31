@@ -1,6 +1,7 @@
 import * as _ from "./funcUtil.js";
 import * as chart from "./chart.js";
 import * as game from "./game.js";
+import State from "./state.js";
 
 const debug = (el, tick, obj) => {
   el.innerHTML = JSON.stringify(
@@ -111,43 +112,35 @@ export const init = () => {
   const ctx = canvas.getContext("2d");
   const chartCtx = chartEl.getContext("2d");
 
-  let state = updateGameState({ objects: game.createRectangles() }, {});
+  const state = new State(updateGameState, {
+    objects: game.createRectangles(),
+  });
 
-  state = updateGameState(state, {
-    type: actionTypes.addObject,
+  state.dispatch(actionTypes.addObject, {
     object: game.createBouncyBall(20, 20, 0.1),
   });
 
-  state = updateGameState(state, {
-    type: actionTypes.addObject,
+  state.dispatch(actionTypes.addObject, {
     object: game.createBouncyBall(40, 20, 0.2),
   });
 
   let timeSeries = chart.initState();
 
   intervalEl.addEventListener("keydown", (e) => {
-    state = updateGameState(state, {
-      type: actionTypes.simulationIntervalKeyPress,
-      key: e.key,
-    });
+    state.dispatch(actionTypes.simulationIntervalKeyPress, { key: e.key });
   });
   intervalIncreaseEl.addEventListener("click", () => {
-    state = updateGameState(state, {
-      type: actionTypes.increaseSimulationInterval,
-    });
+    state.dispatch(actionTypes.increaseSimulationInterval);
   });
   intervalDecreaseEl.addEventListener("click", () => {
-    state = updateGameState(state, {
-      type: actionTypes.decreaseSimulationInterval,
-    });
+    state.dispatch(actionTypes.decreaseSimulationInterval);
   });
   stopBtn.addEventListener("click", () => {
-    state = updateGameState(state, { type: actionTypes.stopClicked });
+    state.dispatch(actionTypes.stopClicked);
   });
 
   canvas.addEventListener("click", (e) => {
-    state = updateGameState(state, {
-      type: actionTypes.canvasClicked,
+    state.dispatch(actionTypes.canvasClicked, {
       x: e.offsetX,
       y: e.offsetY,
       ctx,
@@ -156,13 +149,14 @@ export const init = () => {
 
   const draw = () => {
     ctx.clearRect(0, 0, 500, 500);
-    intervalEl.value = state.simulationInterval;
+    state.dispatch(actionTypes.draw, { ctx });
+    const s = state.getState();
+    intervalEl.value = s.simulationInterval;
     chart.draw(chartCtx, timeSeries);
-    state = updateGameState(state, { type: actionTypes.draw, ctx });
     debug(
       debugEl,
-      state.counter,
-      state.objects.find(_.prop("selected")) || _.tail(state.objects)
+      s.counter,
+      s.objects.find(_.prop("selected")) || _.tail(s.objects)
     );
     if (!state.stopped) {
       requestAnimationFrame(draw);
@@ -170,11 +164,12 @@ export const init = () => {
   };
 
   const tick = () => {
-    state = updateGameState(state, { type: actionTypes.simulationTick });
-    timeSeries = chart.update(timeSeries, state.objects, state.counter);
+    state.dispatch(actionTypes.simulationTick);
+    const s = state.getState();
+    timeSeries = chart.update(timeSeries, s.objects, s.counter);
 
-    if (!state.stopped) {
-      setTimeout(tick, state.simulationInterval);
+    if (!s.stopped) {
+      setTimeout(tick, s.simulationInterval);
     }
   };
 
