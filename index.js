@@ -1,55 +1,12 @@
+import * as _ from "./funcUtil.js";
+
 const CHART_WITDH = 500;
 const CHART_HEIGHT = 100;
 
-function curry(f) {
-  return function currify() {
-    const args = Array.prototype.slice.call(arguments);
-    return args.length >= f.length
-      ? f.apply(null, args)
-      : currify.bind(null, ...args);
-  };
-}
-
-const assoc = (k, v, obj) => ({ ...obj, [k]: v });
-
-const merge = (...args) =>
-  args.reduceRight((prev, current) => ({ ...prev, ...current }));
-
-const mapValues = (func, obj) =>
-  Object.entries(obj).reduce((o, [k, v]) => assoc(k, func(v), o), {});
-
-const range = (from, to) => {
-  const result = [];
-  let n = from;
-  while (n < to) {
-    result.push(n);
-    n += 1;
-  }
-  return result;
-};
-
-const compose = (...fns) => (x) => fns.reduceRight((v, f) => f(v), x);
-
-const append = (v, a) => a.concat(v);
-
-const update = curry((idx, val, a) => a.map((v, i) => (idx === i ? val : v)));
-
-const repeat = (len, v) => {
-  const r = [];
-  for (let i = 0; i < len; i++) {
-    r.push(v);
-  }
-  return r;
-};
-
-const prop = curry((k, o) => o[k]);
-
-const tail = (a) => a[a.length - 1];
-
 const debug = (el, tick, obj) => {
   el.innerHTML = JSON.stringify(
-    merge(
-      mapValues((v) => (typeof v === "number" ? v.toFixed(2) : v), obj),
+    _.merge(
+      _.mapValues((v) => (typeof v === "number" ? v.toFixed(2) : v), obj),
       { tick }
     ),
     null,
@@ -57,7 +14,7 @@ const debug = (el, tick, obj) => {
   );
 };
 
-const drawObj = curry((ctx, obj) => {
+const drawObj = _.curry((ctx, obj) => {
   const path = new Path2D();
   if (obj.shape === "rect") {
     path.rect(obj.x, obj.y, 10, 10);
@@ -87,16 +44,16 @@ const topSpeed = 5;
 const move = (obj) => {
   switch (obj.direction) {
     case "right":
-      return assoc("x", obj.x + obj.speed, obj);
+      return _.assoc("x", obj.x + obj.speed, obj);
 
     case "left":
-      return assoc("x", obj.x - obj.speed, obj);
+      return _.assoc("x", obj.x - obj.speed, obj);
 
     case "up":
-      return assoc("y", obj.y - obj.speed, obj);
+      return _.assoc("y", obj.y - obj.speed, obj);
 
     case "down":
-      return assoc("y", obj.y + obj.speed, obj);
+      return _.assoc("y", obj.y + obj.speed, obj);
   }
 };
 
@@ -105,14 +62,14 @@ const leftRightMovement = (obj) => {
     (obj.direction === "right" && obj.x < 400) ||
     (obj.direction === "left" && obj.x > 100)
   ) {
-    return assoc("speed", Math.min(accelerate(obj.speed), topSpeed), obj);
+    return _.assoc("speed", Math.min(accelerate(obj.speed), topSpeed), obj);
   } else {
     const speed = break_(obj.speed);
     let direction = obj.direction;
     if (speed <= 0.1) {
       direction = direction === "right" ? "left" : "right";
     }
-    return merge({ direction, speed }, obj);
+    return _.merge({ direction, speed }, obj);
   }
 };
 
@@ -129,7 +86,7 @@ const bounce = (obj) => {
     const diff = 9.8 * timeInMs;
     speed = direction === "down" ? speed + diff : speed - diff;
   }
-  return merge({ speed, direction }, obj);
+  return _.merge({ speed, direction }, obj);
 };
 
 const createBouncyBall = (x, y, bounceReduction) => ({
@@ -142,7 +99,7 @@ const createBouncyBall = (x, y, bounceReduction) => ({
   bounceReduction,
 });
 
-function draw() {
+export const init = () => {
   const canvas = document.getElementById("tutorial");
   const chartEl = document.getElementById("chart");
   const debugEl = document.getElementById("debug");
@@ -156,7 +113,7 @@ function draw() {
   let stop = false;
   let interval;
   let canvasPaths;
-  let objects = range(0, 25).map((i) => ({
+  let objects = _.range(0, 25).map((i) => ({
     speed: 1,
     x: 15 + 15 * i,
     y: 15 + 15 * i,
@@ -168,8 +125,8 @@ function draw() {
   objects = objects.concat(createBouncyBall(20, 20, 0.1));
   objects = objects.concat(createBouncyBall(40, 20, 0.2));
 
-  let speedSeries = repeat(CHART_WITDH, 0);
-  let xSeries = repeat(CHART_WITDH, 0);
+  let speedSeries = _.repeat(CHART_WITDH, 0);
+  let xSeries = _.repeat(CHART_WITDH, 0);
   let counter = 0;
 
   const setIntervalLength = (v) => {
@@ -192,13 +149,13 @@ function draw() {
   });
 
   canvas.addEventListener("click", (e) => {
-    const found = false;
+    let found = false;
     objects = objects.map((obj) => {
       const clicked = ctx.isPointInPath(obj.path, e.offsetX, e.offsetY);
       if (clicked) {
         found = true;
       }
-      return assoc("selected", clicked, obj);
+      return _.assoc("selected", clicked, obj);
     });
     if (!found) {
       objects = objects.concat(createBouncyBall(e.offsetX, e.offsetY, 0.2));
@@ -207,8 +164,12 @@ function draw() {
 
   const draw = () => {
     drawChart(chartCtx, { green: xSeries, blue: speedSeries });
-    objects = objects.map((obj) => assoc("path", drawObj(ctx, obj), obj));
-    debug(debugEl, counter, objects.find(prop("selected")) || tail(objects));
+    objects = objects.map((obj) => _.assoc("path", drawObj(ctx, obj), obj));
+    debug(
+      debugEl,
+      counter,
+      objects.find(_.prop("selected")) || _.tail(objects)
+    );
     if (!stop) {
       requestAnimationFrame(draw);
     }
@@ -217,17 +178,17 @@ function draw() {
   const tick = () => {
     counter += 1;
     ctx.clearRect(0, 0, 500, 500);
-    objects = objects.map((obj) => compose(obj.update, move)(obj));
+    objects = objects.map((obj) => _.compose(obj.update, move)(obj));
 
-    speedSeries = update(
+    speedSeries = _.update(
       counter % CHART_WITDH,
-      tail(objects).speed * 10,
+      _.tail(objects).speed * 10,
       speedSeries
     );
-    xSeries = compose(
-      update(counter % CHART_WITDH, tail(objects).y / 10),
-      update((counter % CHART_WITDH) + 1, 0),
-      update((counter % CHART_WITDH) + 2, 0)
+    xSeries = _.compose(
+      _.update(counter % CHART_WITDH, _.tail(objects).y / 10),
+      _.update((counter % CHART_WITDH) + 1, 0),
+      _.update((counter % CHART_WITDH) + 2, 0)
     )(xSeries);
     if (!stop) {
       setTimeout(tick, interval);
@@ -236,4 +197,6 @@ function draw() {
 
   tick();
   draw();
-}
+};
+
+init();
