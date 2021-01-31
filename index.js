@@ -1,7 +1,7 @@
 import * as _ from "./funcUtil.js";
+import * as chart from "./chart.js";
 
 const CHART_WITDH = 500;
-const CHART_HEIGHT = 100;
 
 const debug = (el, tick, obj) => {
   el.innerHTML = JSON.stringify(
@@ -25,17 +25,6 @@ const drawObj = _.curry((ctx, obj) => {
   ctx.fill(path);
   return path;
 });
-
-const drawChart = (ctx, series) => {
-  const height = 100;
-  ctx.clearRect(0, 0, CHART_WITDH, CHART_HEIGHT);
-  Object.entries(series).forEach(([color, values]) => {
-    values.forEach((v, i) => {
-      ctx.fillStyle = color;
-      ctx.fillRect(i, height - v, 1, 1);
-    });
-  });
-};
 
 const accelerate = (speed) => speed + speed * 0.06;
 const break_ = (speed) => speed - speed * 0.06;
@@ -163,7 +152,7 @@ export const init = () => {
   });
 
   const draw = () => {
-    drawChart(chartCtx, { green: xSeries, blue: speedSeries });
+    chart.draw(chartCtx, { green: xSeries, blue: speedSeries });
     objects = objects.map((obj) => _.assoc("path", drawObj(ctx, obj), obj));
     debug(
       debugEl,
@@ -179,17 +168,10 @@ export const init = () => {
     counter += 1;
     ctx.clearRect(0, 0, 500, 500);
     objects = objects.map((obj) => _.compose(obj.update, move)(obj));
+    let res = chart.update({ xSeries, speedSeries }, objects, counter);
+    xSeries = res.xSeries;
+    speedSeries = res.speedSeries;
 
-    speedSeries = _.update(
-      counter % CHART_WITDH,
-      _.tail(objects).speed * 10,
-      speedSeries
-    );
-    xSeries = _.compose(
-      _.update(counter % CHART_WITDH, _.tail(objects).y / 10),
-      _.update((counter % CHART_WITDH) + 1, 0),
-      _.update((counter % CHART_WITDH) + 2, 0)
-    )(xSeries);
     if (!stop) {
       setTimeout(tick, interval);
     }
